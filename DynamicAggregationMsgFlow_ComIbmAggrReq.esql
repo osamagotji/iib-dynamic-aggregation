@@ -1,0 +1,58 @@
+
+
+
+
+CREATE COMPUTE MODULE DynamicAggregationMsgFlow_ComIbmAggrReq
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputRoot.Properties.ReplyProtocol = 'MQ';
+		CREATE NEXTSIBLING OF OutputRoot.Properties DOMAIN 'MQMD';
+		SET OutputRoot.MQMD.Encoding = InputRoot.Properties.Encoding;
+		SET OutputRoot.MQMD.CodedCharSetId = InputRoot.Properties.CodedCharSetId;
+		CREATE LASTCHILD OF OutputRoot DOMAIN ('XML');
+		-- Read Values from Env
+		DECLARE EnvRef REFERENCE TO Environment.AggrFolder.XML;
+		IF LASTMOVE(EnvRef) THEN
+			CREATE LASTCHILD OF OutputRoot.XML FROM EnvRef.AggrReq[1].
+			AggrControlNode.ComIbmAggregateControlNode;
+			DELETE FIELD OutputRoot.XML.ComIbmAggregateControlNode.replies;
+		END IF;
+		DECLARE cnt INTEGER CARDINALITY (EnvRef.AggrReq[]);
+		DECLARE cntlRef REFERENCE TO OutputRoot.XML.ComIbmAggregateControlNode;
+		SET cntlRef.count = cnt ;
+		CREATE LASTCHILD OF cntlRef NAME 'replies';
+		DECLARE iterCnt INTEGER 1;
+
+		MOVE EnvRef FIRSTCHILD TYPE Name NAME 'AggrReq';
+		CREATE FIRSTCHILD OF Environment NAME 'ComIbmAggregateRequestNode';
+		DECLARE comIbmRef REFERENCE TO Environment.ComIbmAggregateRequestNode;
+		CREATE LASTCHILD OF comIbmRef NAME FIELDVALUE(EnvRef.
+		AggrControlNode.ComIbmAggregateControlNode.aggregateName);
+		DECLARE aggrRef REFERENCE TO comIbmRef.*[<1];
+
+		WHILE (iterCnt <= cnt) DO
+			DECLARE reqNodeRef
+			REFERENCE TO EnvRef.AggrReqNode.ComIbmAggregateRequestNode.*[<1].*[<1];
+			CREATE LASTCHILD OF cntlRef.replies
+			NAME (FIELDNAME(reqNodeRef)||CAST(iterCnt AS CHAR));
+			CREATE LASTCHILD OF aggrRef
+			NAME (FIELDNAME(reqNodeRef)||CAST(iterCnt AS CHAR));
+			CREATE LASTCHILD OF cntlRef.replies.*[<1]
+			IDENTITY (XML.Attribute)replyIdentifier VALUE reqNodeRef.replyIdentifier;
+			CREATE LASTCHILD OF aggrRef.*[<1]
+			IDENTITY (XML.Attribute)replyIdentifier VALUE reqNodeRef.replyIdentifier;
+			CREATE LASTCHILD OF cntlRef.replies.*[<1]
+			IDENTITY (XML.Attribute)replyProtocol VALUE reqNodeRef.replyProtocol;
+			CREATE LASTCHILD OF aggrRef.*[<1]
+			IDENTITY (XML.Attribute)replyProtocol VALUE reqNodeRef.replyProtocol;
+			MOVE EnvRef NEXTSIBLING ;
+			SET iterCnt = iterCnt + 1;
+		END WHILE ;
+		-- clear up ENVironment
+		DELETE FIELD Environment.Orig ;
+		DELETE FIELD Environment.AggrFolder ;
+		DECLARE blbHoder BLOB;
+		DECLARE options INTEGER BITOR(FolderBitStream, ValidateContent, ValidateValue);
+	END;
+
+END MODULE;

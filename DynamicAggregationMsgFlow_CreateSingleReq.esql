@@ -1,0 +1,37 @@
+
+
+
+
+CREATE COMPUTE MODULE DynamicAggregationMsgFlow_CreateSingleReq
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		CALL CopyEntireMessage();
+		DECLARE fin REFERENCE TO OutputRoot.*[<1];
+		IF (FIELDNAME(fin)='XML') THEN
+			DELETE FIELD fin;
+		END IF;
+		DECLARE Body REFERENCE To OutputRoot;
+		CREATE Lastchild of OutputRoot AS Body DOMAIN 'XML' ;
+		DECLARE ref REFERENCE TO Environment.Orig.XML.Test;
+		IF (Exists(ref.*[])) THEN
+			MOVE ref LASTCHILD TYPE Name NAME 'Sale' ;
+			CREATE LASTCHILD OF OutputRoot.XML FROM ref ;
+			DELETE FIELD ref;
+		END IF;
+		RETURN TRUE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+END MODULE;

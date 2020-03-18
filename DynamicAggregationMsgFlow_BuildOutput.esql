@@ -1,0 +1,27 @@
+
+
+
+
+CREATE COMPUTE MODULE DynamicAggregationMsgFlow_BuildOutput
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		SET OutputRoot.Properties = InputRoot.Properties;
+		CREATE NEXTSIBLING OF OutputRoot.Properties DOMAIN 'MQMD';
+		SET OutputRoot.MQMD.Version = MQMD_CURRENT_VERSION;
+		CREATE LASTCHILD OF OutputRoot DOMAIN 'XML';
+		CREATE LASTCHILD OF OutputRoot.XML NAME 'ComIbmAggregateReplyBody';
+		DECLARE next INTEGER 1;
+		DECLARE repliesIn REFERENCE TO InputRoot.ComIbmAggregateReplyBody.*[next];
+		DECLARE icnt INTEGER 0;
+		SET icnt = CARDINALITY(InputRoot.ComIbmAggregateReplyBody.*[]);
+		DECLARE repliesOut REFERENCE TO OutputRoot.XML.ComIbmAggregateReplyBody;
+		WHILE next <= icnt DO -- 4-way aggregation
+			CREATE LASTCHILD OF repliesOut NAME FIELDNAME(repliesIn);
+			SET repliesOut.*[next].ReplyIdentifier =
+			CAST(repliesIn.Properties.ReplyIdentifier AS CHAR);
+			MOVE repliesIn NEXTSIBLING;
+			SET next = next + 1;
+		END WHILE;
+	END;
+
+END MODULE;

@@ -1,0 +1,28 @@
+
+
+
+
+CREATE COMPUTE MODULE DynamicAggregationMsgFlow_CombineAggrCnt
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		IF (FIELDNAME(Environment.AggrFolder) IS NULL) THEN
+			CREATE FIELD Environment.AggrFolder ;
+			CREATE LASTCHILD OF Environment.AggrFolder DOMAIN 'XML';
+		END IF;
+
+		DECLARE cntRef REFERENCE TO InputRoot.XML.ComIbmAggregateControlNode;
+		IF (LASTMOVE(cntRef)) THEN
+			CREATE LASTCHILD OF Environment.AggrFolder.XML NAME 'AggrReq';
+			DECLARE AggrRef REFERENCE TO Environment.AggrFolder.XML.AggrReq[<1];
+			CREATE LASTCHILD OF AggrRef NAME 'AggrControlNode' ;
+			--DECLARE AggrCntlRef REFERENCE TO
+			CREATE LASTCHILD OF AggrRef.AggrControlNode FROM cntRef;
+			-- Get the Data from Env for AggrReq Node
+			CREATE LASTCHILD OF AggrRef NAME 'AggrReqNode';
+			DECLARE envRef REFERENCE TO Environment.ComIbmAggregateRequestNode;
+			CREATE LASTCHILD OF AggrRef.AggrReqNode FROM envRef;
+			DELETE FIELD envRef;
+		END IF;
+	END;
+
+END MODULE;
